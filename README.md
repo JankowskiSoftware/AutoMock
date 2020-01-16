@@ -78,7 +78,7 @@ As development goes the number of dependencies changes frequently causing build 
         var mock = new AutoMock<Car>(); // Create AutoMock
         mock.SelectConstructor();       // Discover all dependencies from default constructor
 
-        Car = mock.CreateTarget();      // Create object Car with mocked dependencies
+        Car car = mock.CreateTarget();      // Create object Car with mocked dependencies
 
         // ACT
         car.Drive();
