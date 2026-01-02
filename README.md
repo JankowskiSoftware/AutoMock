@@ -1,8 +1,12 @@
 # AutoMock
 
-This library is very useful when writing Unit Tests. It automatically mocks all dependencies of the tested class. 
+AutoMock solves a critical problem in unit testing: **automatically adapting your tests when class constructor dependencies change**. 
 
-Lets consider following example:
+When writing unit tests, you need to mock all dependencies of the class you're testing. Typically, you manually create these mocks and inject them into your class constructor. However, when your class evolves and its constructor parameters change, you have to manually update every single test that creates that class. AutoMock eliminates this tedious work by automatically discovering and mocking all dependencies at runtime.
+
+## The Problem: Manual Dependency Management
+
+Let's consider a simple example:
 
 ```csharp
     class Car
@@ -21,74 +25,94 @@ Lets consider following example:
     }
  ```
 
- It contains one dependency that needs do be mocked e.g. like this:
+### Writing a Test the Manual Way
+
+You need to mock the `IEngine` dependency and inject it:
 
 ```csharp
-    [Test]
-    void ShouldStartEngine()
-    {
-        // ARRANGE
-        IEngine engine = Substitute.For<IEngine>();
+[Test]
+void ShouldStartEngine()
+{
+    // ARRANGE - Manually create mocks and pass to constructor
+    IEngine engine = Substitute.For<IEngine>();
+    
+    Car car = new Car(engine);
 
-        Car car = new Car(engine);
+    // ACT
+    car.Drive();
 
-        // ACT
-        car.Drive();
+    // ASSERT
+    engine
+        .Received()
+        .Start();
+}
+```
 
-        // ASSERT
-        engine
-            .Received()
-            .Start();
-    }
- ```
+This works fine initially, but what happens when your class evolves?
 
-As development goes the number of dependencies changes frequently causing build errors and lots of work with fixing tests e.g.:
+### AutoMock: Automatic Dependency Discovery
 
 ```csharp
-    class Car
-    {
-        private readonly IEngine _engine;
-        private readonly ILights _lights;
-        private readonly IDors _dors;
+[Test]
+public void ShouldStartEngine()
+{
+    // ARRANGE - AutoMock automatically discovers and mocks all dependencies
+    var mock = new AutoMock<Car>();
+    mock.SelectConstructor();                // Discover all constructor dependencies
+    
+    Car car = mock.CreateTarget();           // Car instance with all mocks injected
+    
+    // ACT
+    car.Drive();
 
-        public Car(IEngine engine, ILights lights, IDors dors)
-        {
-            _engine = engine;
-            _lights = lights;
-            _dors = dors;
-        }
+    // ASSERT
+    // Gets the automatically created mock
+    var engineMock = mock.GetMock<IEngine>()
+        
+    // examin the expected result
+    engineMock.Received()
+        .Start();
+}
+```
 
-        public void Drive()
-        {
-            _engine.Start();
-        }
-    }
- ```
+Notice what happens: **Even when the `Car` constructor changes to require `ILights` and `IDoors`, this test doesn't need any modifications!** AutoMock automatically handles the new dependencies.
 
- In that case You would need to fix all tests that create the Car object.   
- However when using AutoMock witch is discovering all dependencies at run time you would not need to fix anything.
+## How AutoMock Works
 
- Below you will find the same test written using AutoMock:
+1. **`new AutoMock<Car>()`** - Creates an AutoMock container for the `Car` class
+2. **`SelectConstructor()`** - Examines the `Car` constructor and identifies all its dependencies (`IEngine`, `ILights`, `IDoors`, etc.)
+3. **AutoMock creates mocks** - Automatically creates mock implementations for each dependency
+4. **`CreateTarget()`** - Instantiates a `Car` object, injecting all the mocks into the constructor
+5. **`GetMock<T>()`** - Retrieves a specific mock when you need to verify its behavior
 
-```csharp 
-    [Test]
-    public void ShouldRun()
-    {
-        // ARRANGE
-        var mock = new AutoMock<Car>(); // Create AutoMock
-        mock.SelectConstructor();       // Discover all dependencies from default constructor
+## Why This Matters
 
-        Car car = mock.CreateTarget();      // Create object Car with mocked dependencies
+| Approach | Adding a new dependency |
+|----------|----------------------|
+| **Manual Mocking** | Update every test that creates the class ❌ |
+| **AutoMock** | No test changes needed ✅ |
 
-        // ACT
-        car.Drive();
+As your codebase grows with hundreds of tests, this small difference compounds into massive time savings and fewer bugs.
 
-        // ASSERT
-        mock.GetMock<IEngine>()         // Get the mock that was automatically discovered and injected
-            .Received()
-            .Start();
-    }
- ```
+## Key Benefits
 
-# Samples 
-You will find more examples of how to use this library in AutoMock.Samples.SimpleExample project.
+- **Automatic dependency discovery** - No manual mock setup
+- **Constructor-agnostic** - Tests work regardless of parameter count
+- **Refactoring-friendly** - Change constructors without breaking tests
+- **Less boilerplate** - Write tests faster with less code
+- **Backward compatible** - Works with any mocking framework
+
+## Common Use Cases
+
+- Testing classes with multiple dependencies
+- Refactoring code while maintaining tests
+- Building test suites that are resilient to design changes
+- Reducing repetitive mock setup code
+
+# Samples and More Examples
+
+You will find additional examples of how to use AutoMock in the `AutoMock.Samples` project, including:
+- Simple dependency injection scenarios
+- Selecting specific constructors
+- Injecting custom dependency instances
+- Using custom mock factories
